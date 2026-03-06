@@ -1,0 +1,53 @@
+package week11;
+
+import java.util.*;
+
+public class PlayerService {
+
+    PlayerDao dao = new PlayerDao();
+
+    public void addPlayer(Player p){
+
+        if(dao.insertPlayer(p))
+            System.out.println("Insert Successful");
+        else
+            System.out.println("Insert Failed");
+    }
+
+    public void updatePlayer(Player p){
+
+        if(dao.updatePlayer(p))
+            System.out.println("Update Successful");
+        else
+            System.out.println("Update Failed");
+    }
+
+    public void deletePlayer(int uid){
+
+        if(dao.deletePlayer(uid))
+            System.out.println("Delete Successful");
+        else
+            System.out.println("Delete Failed");
+    }
+
+    public void averageAge(){
+
+        List<Player> list =
+        dao.getPlayers();
+
+        int total = 0;
+
+        for(Player p : list)
+            total += p.getAge();
+
+        System.out.println(
+        "Average Age = " +
+        (total/list.size()));
+    }
+
+    public void drop(){
+        dao.dropTable();
+        System.out.println(
+        "Table Dropped");
+    }
+}
