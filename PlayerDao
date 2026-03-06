@@ -1,0 +1,110 @@
+package week11;
+
+import java.sql.*;
+import java.util.*;
+
+public class PlayerDao {
+
+    public boolean insertPlayer(Player p){
+
+        String sql =
+        "INSERT INTO PLAYERS VALUES(?,?,?,?)";
+
+        try(Connection conn = DBConnection.getConnection();
+            PreparedStatement ps =
+            conn.prepareStatement(sql)){
+
+            ps.setInt(1,p.getUid());
+            ps.setString(2,p.getFirstName());
+            ps.setString(3,p.getLastName());
+            ps.setInt(4,p.getAge());
+
+            return ps.executeUpdate()==1;
+        }
+        catch(Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    public boolean updatePlayer(Player p){
+
+        String sql =
+        "UPDATE PLAYERS SET First_Name=?,Last_Name=?,Age=? WHERE UID=?";
+
+        try(Connection conn = DBConnection.getConnection();
+            PreparedStatement ps =
+            conn.prepareStatement(sql)){
+
+            ps.setString(1,p.getFirstName());
+            ps.setString(2,p.getLastName());
+            ps.setInt(3,p.getAge());
+            ps.setInt(4,p.getUid());
+
+            return ps.executeUpdate()==1;
+        }
+        catch(Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    public boolean deletePlayer(int uid){
+
+        String sql =
+        "DELETE FROM PLAYERS WHERE UID=?";
+
+        try(Connection conn = DBConnection.getConnection();
+            PreparedStatement ps =
+            conn.prepareStatement(sql)){
+
+            ps.setInt(1,uid);
+            return ps.executeUpdate()==1;
+        }
+        catch(Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    public List<Player> getPlayers(){
+
+        List<Player> list = new ArrayList<>();
+
+        String sql = "SELECT * FROM PLAYERS";
+
+        try(Connection conn = DBConnection.getConnection();
+            Statement stmt =
+            conn.createStatement();
+            ResultSet rs =
+            stmt.executeQuery(sql)){
+
+            while(rs.next()){
+
+                Player p = new Player(
+                rs.getInt("UID"),
+                rs.getString("First_Name"),
+                rs.getString("Last_Name"),
+                rs.getInt("Age")
+                );
+
+                list.add(p);
+            }
+        }
+        catch(Exception e){
+            throw new RuntimeException(e);
+        }
+        return list;
+    }
+
+    public void dropTable(){
+
+        try(Connection conn = DBConnection.getConnection();
+            Statement stmt =
+            conn.createStatement()){
+
+            stmt.executeUpdate(
+            "DROP TABLE PLAYERS");
+        }
+        catch(Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+}
