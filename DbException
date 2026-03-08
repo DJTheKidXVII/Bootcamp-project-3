@@ -1,0 +1,21 @@
+package projects.exception;
+
+/**
+ * Custom unchecked exception used throughout the projects application
+ * to wrap checked exceptions (SQLException) and signal business-logic errors.
+ */
+@SuppressWarnings("serial")
+public class DbException extends RuntimeException {
+
+    public DbException(String message) {
+        super(message);
+    }
+
+    public DbException(Throwable cause) {
+        super(cause);
+    }
+
+    public DbException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}
