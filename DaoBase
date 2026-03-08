@@ -1,0 +1,162 @@
+package projects.dao;
+
+import java.lang.reflect.Field;
+import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
+import java.time.LocalTime;
+import java.util.Objects;
+
+import projects.exception.DbException;
+
+/**
+ * Base class that provides common transaction-management helpers and a
+ * reflection-based {@code extract()} utility for mapping ResultSet rows
+ * to entity objects.
+ */
+public abstract class DaoBase {
+
+    // ------------------------------------------------------------------ //
+    //  Transaction helpers
+    // ------------------------------------------------------------------ //
+
+    protected void startTransaction(Connection conn) throws SQLException {
+        conn.setAutoCommit(false);
+    }
+
+    protected void commitTransaction(Connection conn) throws SQLException {
+        conn.commit();
+    }
+
+    protected void rollbackTransaction(Connection conn) {
+        try {
+            conn.rollback();
+        } catch (SQLException e) {
+            throw new DbException(e);
+        }
+    }
+
+    // ------------------------------------------------------------------ //
+    //  Get the last auto-increment ID
+    // ------------------------------------------------------------------ //
+
+    protected Integer getLastInsertId(Connection conn, String table)
+            throws SQLException {
+
+        String sql = String.format("SELECT LAST_INSERT_ID() FROM %s", table);
+
+        try (Statement stmt   = conn.createStatement();
+             ResultSet rs     = stmt.executeQuery(sql)) {
+
+            if (rs.next()) {
+                return rs.getObject(1, Integer.class);
+            }
+
+            throw new DbException(
+                    "Unable to retrieve the primary key value. None returned.");
+        }
+    }
+
+    // ------------------------------------------------------------------ //
+    //  Set a PreparedStatement parameter (handles nulls)
+    // ------------------------------------------------------------------ //
+
+    protected <T> void setParameter(PreparedStatement stmt,
+            int parameterIndex, T value, Class<T> classType)
+            throws SQLException {
+
+        int sqlType = convertJavaClassToSqlType(classType);
+
+        if (Objects.isNull(value)) {
+            stmt.setNull(parameterIndex, sqlType);
+        } else {
+            switch (sqlType) {
+                case Types.DECIMAL -> stmt.setBigDecimal(parameterIndex, (BigDecimal) value);
+                case Types.DOUBLE  -> stmt.setDouble(parameterIndex, (Double) value);
+                case Types.INTEGER -> stmt.setInt(parameterIndex, (Integer) value);
+                case Types.OTHER   -> stmt.setObject(parameterIndex, value);
+                case Types.VARCHAR -> stmt.setString(parameterIndex, (String) value);
+                default            -> throw new DbException(
+                        "Unknown parameter type: " + classType);
+            }
+        }
+    }
+
+    private int convertJavaClassToSqlType(Class<?> classType) {
+        if (Integer.class.equals(classType))    return Types.INTEGER;
+        if (String.class.equals(classType))     return Types.VARCHAR;
+        if (Double.class.equals(classType))     return Types.DOUBLE;
+        if (BigDecimal.class.equals(classType)) return Types.DECIMAL;
+        if (LocalTime.class.equals(classType))  return Types.OTHER;
+
+        throw new DbException(
+                "Unsupported class type: " + classType.getName());
+    }
+
+    // ------------------------------------------------------------------ //
+    //  Reflective ResultSet → entity mapper
+    // ------------------------------------------------------------------ //
+
+    /**
+     * Maps all columns in the current ResultSet row to a new instance of
+     * the given class using camelCase ↔ snake_case field name conversion.
+     */
+    protected <T> T extract(ResultSet rs, Class<T> classType) {
+        try {
+            T obj = classType.getConstructor().newInstance();
+            int numColumns = rs.getMetaData().getColumnCount();
+
+            for (int col = 1; col <= numColumns; col++) {
+                String columnName = rs.getMetaData().getColumnName(col);
+                String fieldName  = camelCase(columnName);
+                Object columnValue = rs.getObject(col);
+
+                Field field = null;
+                Class<?> cls = classType;
+
+                while (Objects.nonNull(cls)) {
+                    try {
+                        field = cls.getDeclaredField(fieldName);
+                        break;
+                    } catch (NoSuchFieldException e) {
+                        cls = cls.getSuperclass();
+                    }
+                }
+
+                if (Objects.nonNull(field) && Objects.nonNull(columnValue)) {
+                    field.setAccessible(true);
+                    field.set(obj, columnValue);
+                }
+            }
+
+            return obj;
+
+        } catch (Exception e) {
+            throw new DbException(e);
+        }
+    }
+
+    /**
+     * Converts snake_case column names to camelCase field names.
+     * e.g. "project_name" → "projectName"
+     */
+    private String camelCase(String columnName) {
+        StringBuilder sb = new StringBuilder();
+        boolean nextUpper = false;
+
+        for (char c : columnName.toCharArray()) {
+            if (c == '_') {
+                nextUpper = true;
+            } else {
+                sb.append(nextUpper ? Character.toUpperCase(c) : c);
+                nextUpper = false;
+            }
+        }
+
+        return sb.toString();
+    }
+}
